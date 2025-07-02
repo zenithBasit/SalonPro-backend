@@ -1,0 +1,23 @@
+salonpro-backend/
+├── config/
+│   └── database.go
+├── models/
+│   ├── user.go
+│   ├── customer.go
+│   ├── service.go
+│   ├── invoice.go
+│   ├── invoice_item.go
+│   └── reminder_template.go
+├── controllers/
+│   ├── auth.go
+│   ├── customer.go
+│   ├── service.go
+│   ├── invoice.go
+│   └── reminder.go
+├── routes/
+│   └── routes.go
+├── utils/
+│   ├── auth.go
+│   └── database.go
+├── go.mod
+└── main.go

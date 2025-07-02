@@ -54,6 +54,7 @@ func CreateService(c *gin.Context) {
 
 	// Create new service
 	service := models.Service{
+		ID:          uuid.New(),
 		SalonID:     salonUUID,
 		Name:        input.Name,
 		Description: input.Description,

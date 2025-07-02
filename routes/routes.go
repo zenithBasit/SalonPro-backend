@@ -27,13 +27,11 @@ func SetupRouter() *gin.Engine {
 		api.DELETE("/customers/:id", controllers.DeleteCustomer)
 
 		// Services routes
-		serviceGroup := r.Group("/services")
-
-		serviceGroup.POST("", controllers.CreateService)
-		serviceGroup.GET("", controllers.GetServices)
-		serviceGroup.GET("/:id", controllers.GetService)
-		serviceGroup.PUT("/:id", controllers.UpdateService)
-		serviceGroup.DELETE("/:id", controllers.DeleteService)
+		api.POST("/services", controllers.CreateService)
+		api.GET("/services", controllers.GetServices)
+		api.GET("/services/:id", controllers.GetService)
+		api.PUT("/services/:id", controllers.UpdateService)
+		api.DELETE("/services/:id", controllers.DeleteService)
 	}
 
 	return r

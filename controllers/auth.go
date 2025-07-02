@@ -85,6 +85,18 @@ func Register(c *gin.Context) {
 		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
+	expiryHours := 24
+	maxAge := expiryHours * 3600
+
+	c.SetCookie(
+		"token",
+		token,
+		maxAge,
+		"/",
+		"",
+		true,
+		true,
+	)
 
 	// Return response without password
 	c.JSON(http.StatusCreated, gin.H{
@@ -140,6 +152,19 @@ func Login(c *gin.Context) {
 	// Update last login
 	now := time.Now()
 	config.DB.Model(&user).Update("last_login", &now)
+
+		expiryHours := 24
+	maxAge := expiryHours * 3600
+
+	c.SetCookie(
+		"token",
+		token,
+		maxAge,
+		"/",
+		"",
+		true,
+		true,
+	)
 
 	// Return response
 	c.JSON(http.StatusOK, gin.H{

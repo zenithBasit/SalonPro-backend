@@ -17,7 +17,7 @@ type Invoice struct {
 	Discount      float64   `gorm:"type:decimal(10,2);default:0.0"`
 	Tax           float64   `gorm:"type:decimal(10,2);default:0.0"`
 	Total         float64   `gorm:"type:decimal(10,2);not null"`
-	PaymentStatus string    `gorm:"type:enum('paid','unpaid','partial');default:'unpaid'"`
+	PaymentStatus string    `gorm:"type:payment_status;default:'unpaid'"`
 	PaidAmount    float64   `gorm:"type:decimal(10,2);default:0.0"`
 	PaymentMethod string
 	Notes         string

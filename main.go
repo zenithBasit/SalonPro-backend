@@ -12,7 +12,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func main() {
+func init() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
@@ -28,6 +28,9 @@ func main() {
 		&models.ReminderTemplate{},
 		// ... other models
 	)
+}
+
+func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {

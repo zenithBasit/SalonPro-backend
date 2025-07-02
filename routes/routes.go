@@ -32,6 +32,13 @@ func SetupRouter() *gin.Engine {
 		api.GET("/services/:id", controllers.GetService)
 		api.PUT("/services/:id", controllers.UpdateService)
 		api.DELETE("/services/:id", controllers.DeleteService)
+
+		// Invoices routes
+		api.POST("/invoices", controllers.CreateInvoice)
+		api.GET("/invoices", controllers.GetInvoices)
+		api.GET("/invoices/:id", controllers.GetInvoice)
+		api.PUT("/invoices/:id", controllers.UpdateInvoice)
+		api.DELETE("/invoices/:id", controllers.DeleteInvoice)
 	}
 
 	return r

@@ -1,7 +1,9 @@
 package routes
 
 import (
+	"salonpro-backend/config"
 	"salonpro-backend/controllers"
+	"salonpro-backend/services"
 	"salonpro-backend/utils"
 
 	"github.com/gin-gonic/gin"
@@ -9,6 +11,12 @@ import (
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
+
+	r.GET("/test-reminder", func(c *gin.Context) {
+		reminderService := services.NewReminderService(config.DB)
+		reminderService.SendDailyReminders()
+		c.JSON(200, gin.H{"message": "Reminders triggered"})
+	})
 
 	auth := r.Group("/auth")
 	{

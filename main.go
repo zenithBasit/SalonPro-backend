@@ -26,6 +26,7 @@ func init() {
 		&models.Invoice{},
 		&models.InvoiceItem{},
 		&models.ReminderTemplate{},
+		&models.ReminderLog{},
 		// ... other models
 	)
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,10 +38,16 @@ func CheckPasswordHash(password, hash string) bool {
 
 // Generate JWT token
 func GenerateToken(userID, salonID string) (string, error) {
+	expiryHours := 24 // default
+	if env := os.Getenv("JWT_EXPIRY_HOURS"); env != "" {
+		if h, err := strconv.Atoi(env); err == nil {
+			expiryHours = h
+		}
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":     userID,
 		"salonId": salonID,
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
+		"exp":     time.Now().Add(time.Duration(expiryHours) * time.Hour).Unix(),
 		"iat":     time.Now().Unix(),
 	})
 

@@ -55,6 +55,9 @@ func SetupRouter() *gin.Engine {
 		api.PUT("/reminder-templates/:id", controllers.UpdateReminderTemplate)
 		api.DELETE("/reminder-templates/:id", controllers.DeleteReminderTemplate)
 
+		//Reports routes
+		reportController := controllers.ReportController{}
+        api.GET("/reports", reportController.GetReportAnalytics)
 	}
 
 	return r

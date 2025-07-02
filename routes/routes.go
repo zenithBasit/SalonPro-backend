@@ -39,6 +39,14 @@ func SetupRouter() *gin.Engine {
 		api.GET("/invoices/:id", controllers.GetInvoice)
 		api.PUT("/invoices/:id", controllers.UpdateInvoice)
 		api.DELETE("/invoices/:id", controllers.DeleteInvoice)
+
+		// Reminders routes
+		api.POST("/reminder-templates", controllers.CreateReminderTemplate)
+		api.GET("/reminder-templates", controllers.GetReminderTemplates)
+		api.GET("/reminder-templates/:id", controllers.GetReminderTemplate)
+		api.PUT("/reminder-templates/:id", controllers.UpdateReminderTemplate)
+		api.DELETE("/reminder-templates/:id", controllers.DeleteReminderTemplate)
+
 	}
 
 	return r

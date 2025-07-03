@@ -17,6 +17,7 @@ import (
 type RegisterInput struct {
 	Email        string       `json:"email" binding:"required,email"`
 	Phone        string       `json:"phone" binding:"required"`
+	Name		 string       `json:"name" binding:"required"` // Default name is email, can be changed later
 	Password     string       `json:"password" binding:"required,min=8"`
 	SalonName    string       `json:"salonName" binding:"required"`
 	SalonAddress string       `json:"salonAddress"`
@@ -54,6 +55,7 @@ func Register(c *gin.Context) {
 	newUser := models.User{
 		Email:        input.Email,
 		Phone:        input.Phone,
+		Name:         input.Name,     // Default name is email, can be changed later
 		Password:     input.Password, // Will be hashed in BeforeCreate hook
 		SalonName:    input.SalonName,
 		SalonAddress: input.SalonAddress,
@@ -153,7 +155,7 @@ func Login(c *gin.Context) {
 	now := time.Now()
 	config.DB.Model(&user).Update("last_login", &now)
 
-		expiryHours := 24
+	expiryHours := 24
 	maxAge := expiryHours * 3600
 
 	c.SetCookie(

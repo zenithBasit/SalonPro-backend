@@ -15,6 +15,7 @@ type User struct {
 	ID                uuid.UUID `gorm:"type:uuid;primary_key"`
 	Email             string    `gorm:"uniqueIndex;not null"`
 	Password          string    `gorm:"not null"`
+	Name              string    `gorm:"not null"`
 	Phone             string
 	SalonName         string `gorm:"not null"`
 	SalonAddress      string

@@ -6,11 +6,19 @@ import (
 	"salonpro-backend/services"
 	"salonpro-backend/utils"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000"}, // change to your frontend URL
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
+		AllowCredentials: true,
+	}))
 
 	r.GET("/test-reminder", func(c *gin.Context) {
 		reminderService := services.NewReminderService(config.DB)
@@ -57,7 +65,7 @@ func SetupRouter() *gin.Engine {
 
 		//Reports routes
 		reportController := controllers.ReportController{}
-        api.GET("/reports", reportController.GetReportAnalytics)
+		api.GET("/reports", reportController.GetReportAnalytics)
 	}
 
 	return r

@@ -17,7 +17,7 @@ import (
 type RegisterInput struct {
 	Email        string       `json:"email" binding:"required,email"`
 	Phone        string       `json:"phone" binding:"required"`
-	Name		 string       `json:"name" binding:"required"` // Default name is email, can be changed later
+	Name         string       `json:"name" binding:"required"` // Default name is email, can be changed later
 	Password     string       `json:"password" binding:"required,min=8"`
 	SalonName    string       `json:"salonName" binding:"required"`
 	SalonAddress string       `json:"salonAddress"`
@@ -201,4 +201,28 @@ func createDefaultReminderTemplates(salonID uuid.UUID) error {
 		}
 	}
 	return nil
+}
+
+func Me(c *gin.Context) {
+	userID, exists := c.Get("userId")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User ID not found in context"})
+		return
+	}
+
+	var user models.User
+	if err := config.DB.First(&user, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Return user info
+	c.JSON(http.StatusOK, gin.H{
+		"user": gin.H{
+			"id":        user.ID,
+			"email":     user.Email,
+			"name":      user.Name,
+			"salonName": user.SalonName,
+		},
+	})
 }

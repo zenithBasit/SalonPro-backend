@@ -145,16 +145,16 @@ func (rc *ReportController) GetReportAnalytics(c *gin.Context) {
 
 	// Create response
 	summary := AnalyticsSummary{
-    CurrentMonthRevenue:   currentMonthRevenue,
-    MonthGrowth:           monthGrowth,
-    CurrentQuarterRevenue: currentQuarterRevenue,
-    QuarterGrowth:         quarterGrowth,
-    CurrentYearRevenue:    currentYearRevenue,
-    YearGrowth:            yearGrowth,
-    TopServices:           topServices,
-    TopCustomers:          topCustomers,
-    QuickStats:            quickStats,
-}
+		CurrentMonthRevenue:   currentMonthRevenue,
+		MonthGrowth:           monthGrowth,
+		CurrentQuarterRevenue: currentQuarterRevenue,
+		QuarterGrowth:         quarterGrowth,
+		CurrentYearRevenue:    currentYearRevenue,
+		YearGrowth:            yearGrowth,
+		TopServices:           topServices,
+		TopCustomers:          topCustomers,
+		QuickStats:            quickStats,
+	}
 
 	c.JSON(http.StatusOK, summary)
 }
@@ -245,12 +245,12 @@ func (rc *ReportController) getQuickStatistics(salonID uuid.UUID) (QuickStatisti
 	// Average Monthly Visits
 	var avgVisits float64
 	err := config.DB.Raw(`
-		SELECT AVG(visits) FROM (
+		SELECT COALESCE(AVG(visits), 0) FROM (
 			SELECT COUNT(*) as visits
 			FROM invoices
 			WHERE salon_id = ? AND deleted_at IS NULL
 			GROUP BY DATE_TRUNC('month', invoice_date)
-		) monthly_visits
+    	) monthly_visits
 	`, salonID).Scan(&avgVisits).Error
 	if err != nil {
 		return stats, err

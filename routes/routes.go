@@ -67,6 +67,9 @@ func SetupRouter() *gin.Engine {
 		//Reports routes
 		reportController := controllers.ReportController{}
 		api.GET("/reports", reportController.GetReportAnalytics)
+
+		// Dashboard routes
+		api.GET("/dashboard", controllers.GetDashboardOverview)
 	}
 
 	return r

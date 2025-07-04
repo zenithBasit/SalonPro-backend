@@ -70,6 +70,15 @@ func SetupRouter() *gin.Engine {
 
 		// Dashboard routes
 		api.GET("/dashboard", controllers.GetDashboardOverview)
+
+		// Settings routes
+		auth.GET("/profile", utils.AuthMiddleware(), controllers.GetProfile)
+		auth.PUT("/update-profile", utils.AuthMiddleware(), controllers.UpdateProfile)
+		auth.PUT("/working-hours", utils.AuthMiddleware(), controllers.UpdateWorkingHours)
+		auth.PUT("/notification-settings", utils.AuthMiddleware(), controllers.UpdateNotificationSettings)
+
+		api.GET("/reminder-settings", controllers.GetReminderSettings)
+		api.PUT("/reminder-settings", controllers.UpdateReminderSetting)
 	}
 
 	return r

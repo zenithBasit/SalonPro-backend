@@ -12,20 +12,24 @@ import (
 )
 
 type User struct {
-	ID                uuid.UUID `gorm:"type:uuid;primary_key"`
-	Email             string    `gorm:"uniqueIndex;not null"`
-	Password          string    `gorm:"not null"`
-	Name              string    `gorm:"not null"`
-	Phone             string
-	SalonName         string `gorm:"not null"`
-	SalonAddress      string
-	WorkingHours      JSONB `gorm:"type:jsonb;default:'{}'"`
-	IsActive          bool  `gorm:"default:true"`
-	LastLogin         *time.Time
-	Customers         []Customer         `gorm:"foreignKey:SalonID;references:ID"`
-	Services          []Service          `gorm:"foreignKey:SalonID;references:ID"`
-	Invoices          []Invoice          `gorm:"foreignKey:SalonID;references:ID"`
-	ReminderTemplates []ReminderTemplate `gorm:"foreignKey:SalonID;references:ID"`
+	ID                    uuid.UUID `gorm:"type:uuid;primary_key"`
+	Email                 string    `gorm:"uniqueIndex;not null"`
+	Password              string    `gorm:"not null"`
+	Name                  string    `gorm:"not null"`
+	Phone                 string
+	SalonName             string `gorm:"not null"`
+	SalonAddress          string
+	WorkingHours          JSONB `gorm:"type:jsonb;default:'{}'"`
+	IsActive              bool  `gorm:"default:true"`
+	BirthdayReminders     bool  `gorm:"default:true"`
+	AnniversaryReminders  bool  `gorm:"default:true"`
+	WhatsAppNotifications bool  `gorm:"default:false"`
+	SMSNotifications      bool  `gorm:"default:false"`
+	LastLogin             *time.Time
+	Customers             []Customer         `gorm:"foreignKey:SalonID;references:ID"`
+	Services              []Service          `gorm:"foreignKey:SalonID;references:ID"`
+	Invoices              []Invoice          `gorm:"foreignKey:SalonID;references:ID"`
+	ReminderTemplates     []ReminderTemplate `gorm:"foreignKey:SalonID;references:ID"`
 	gorm.Model
 }
 

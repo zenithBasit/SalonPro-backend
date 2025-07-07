@@ -20,13 +20,14 @@ func init() {
 	config.ConnectDB()
 
 	config.DB.AutoMigrate(
+		&models.Salon{},
 		&models.User{},
 		&models.Customer{},
 		&models.Service{},
 		&models.Invoice{},
 		&models.InvoiceItem{},
 		&models.ReminderTemplate{},
-		&models.ReminderLog{},
+		// &models.ReminderLog{},
 		// ... other models
 	)
 }

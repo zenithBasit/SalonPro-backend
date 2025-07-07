@@ -7,192 +7,229 @@ import (
 	"salonpro-backend/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type UpdateProfileInput struct {
-	SalonName    string       `json:"salonName"`
-	SalonAddress string       `json:"salonAddress"`
-	Phone        string       `json:"phone"`
-	Email        string       `json:"email"`
+	SalonName    string `json:"salonName"`
+	SalonAddress string `json:"salonAddress"`
+	Phone        string `json:"phone"`
+	Email        string `json:"email"`
 	// WorkingHours models.JSONB `json:"workingHours"` // or your working hours struct
 }
 
 func GetProfile(c *gin.Context) {
-    userID, exists := c.Get("userId")
-    if !exists {
-        utils.RespondWithError(c, http.StatusUnauthorized, "User not found")
-        return
-    }
+	// Get salon ID from context
+	salonID, exists := c.Get("salonId")
+	if !exists {
+		utils.RespondWithError(c, http.StatusUnauthorized, "Salon ID not found")
+		return
+	}
+	salonUUID, err := uuid.Parse(salonID.(string))
+	if err != nil {
+		utils.RespondWithError(c, http.StatusInternalServerError, "Invalid salon ID format")
+		return
+	}
 
-    var user models.User
-    if err := config.DB.First(&user, "id = ?", userID).Error; err != nil {
-        utils.RespondWithError(c, http.StatusNotFound, "User not found")
-        return
-    }
+	// --- Fetch user (salon profile + working hours + notification settings) ---
+	var user models.User
+    var salon models.Salon
+	if err := config.DB.First(&user, "id = ?", salonUUID).Error; err != nil {
+		utils.RespondWithError(c, http.StatusInternalServerError, "User not found")
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{
-        "salonName":    user.SalonName,
-        "salonAddress": user.SalonAddress,
-        "phone":        user.Phone,
-        "email":        user.Email,
-        "workingHours": user.WorkingHours,
-        "birthdayReminders":    user.BirthdayReminders,
-        "anniversaryReminders": user.AnniversaryReminders,
-        "whatsAppNotifications": user.WhatsAppNotifications,
-        "smsNotifications":      user.SMSNotifications,
-    })
+	// --- Fetch reminder templates ---
+	var reminderTemplates []models.ReminderTemplate
+	if err := config.DB.Where("salon_id = ?", salonUUID).Find(&reminderTemplates).Error; err != nil {
+		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to fetch reminder templates")
+		return
+	}
+
+	// Extract messages
+	var birthdayMessage, anniversaryMessage string
+	for _, tmpl := range reminderTemplates {
+		switch tmpl.Type {
+		case "birthday":
+			birthdayMessage = tmpl.Message
+		case "anniversary":
+			anniversaryMessage = tmpl.Message
+		}
+	}
+
+	// --- Return combined response ---
+	c.JSON(http.StatusOK, gin.H{
+		"salonProfile": gin.H{
+			"salonName":    salon.Name,
+			"address":      salon.Address,
+			"phone":        user.Phone,
+			"email":        user.Email,
+			"workingHours": salon.WorkingHours,
+		},
+		"messageTemplates": gin.H{
+			"birthday":    birthdayMessage,
+			"anniversary": anniversaryMessage,
+		},
+		"notifications": gin.H{
+			"birthdayReminders":     salon.BirthdayReminders,
+			"anniversaryReminders":  salon.AnniversaryReminders,
+			"whatsAppNotifications": salon.WhatsAppNotifications,
+			"smsNotifications":      salon.SMSNotifications,
+		},
+	})
 }
 
-func UpdateProfile(c *gin.Context) {
-	userID, exists := c.Get("userId")
+type UpdateSalonProfileInput struct {
+	SalonName string `json:"salonName"`
+	Address   string `json:"salonAddress"`
+	Phone     string `json:"phone"`
+	Email     string `json:"email"`
+}
+
+func UpdateSalonProfile(c *gin.Context) {
+	salonID, exists := c.Get("salonId")
 	if !exists {
-		utils.RespondWithError(c, http.StatusUnauthorized, "User not found")
+		utils.RespondWithError(c, http.StatusUnauthorized, "Salon ID not found")
+		return
+	}
+	salonUUID, err := uuid.Parse(salonID.(string))
+	if err != nil {
+		utils.RespondWithError(c, http.StatusBadRequest, "Invalid salon ID")
 		return
 	}
 
-	var input UpdateProfileInput
+	var input UpdateSalonProfileInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		utils.RespondWithError(c, http.StatusBadRequest, "Invalid input")
+		utils.RespondWithError(c, http.StatusBadRequest, "Invalid input: "+err.Error())
 		return
 	}
 
-	var user models.User
-	if err := config.DB.First(&user, "id = ?", userID).Error; err != nil {
-		utils.RespondWithError(c, http.StatusNotFound, "User not found")
-		return
-	}
-
-	// Update fields
-	user.SalonName = input.SalonName
-	user.SalonAddress = input.SalonAddress
-	user.Phone = input.Phone
-	user.Email = input.Email
-	// user.WorkingHours = input.WorkingHours
-
-	if err := config.DB.Save(&user).Error; err != nil {
+	if err := config.DB.Model(&models.User{}).
+		Where("id = ?", salonUUID).
+		Updates(map[string]interface{}{
+			"salon_name":    input.SalonName,
+			"salon_address": input.Address,
+			"phone":         input.Phone,
+			"email":         input.Email,
+		}).Error; err != nil {
 		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to update profile")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Profile updated"})
+	c.JSON(http.StatusOK, gin.H{"message": "Profile updated successfully"})
+}
+
+type UpdateWorkingHoursInput struct {
+	WorkingHours models.JSONB `json:"workingHours"`
 }
 
 func UpdateWorkingHours(c *gin.Context) {
-    userID, exists := c.Get("userId")
-    if !exists {
-        utils.RespondWithError(c, http.StatusUnauthorized, "User not found")
-        return
-    }
+	salonID, exists := c.Get("salonId")
+	if !exists {
+		utils.RespondWithError(c, http.StatusUnauthorized, "Salon ID not found")
+		return
+	}
+	salonUUID, err := uuid.Parse(salonID.(string))
+	if err != nil {
+		utils.RespondWithError(c, http.StatusBadRequest, "Invalid salon ID")
+		return
+	}
 
-    var input struct {
-        WorkingHours models.JSONB `json:"workingHours"`
-    }
-    if err := c.ShouldBindJSON(&input); err != nil {
-        utils.RespondWithError(c, http.StatusBadRequest, "Invalid input")
-        return
-    }
+	var input UpdateWorkingHoursInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		utils.RespondWithError(c, http.StatusBadRequest, "Invalid input: "+err.Error())
+		return
+	}
 
-    if err := config.DB.Model(&models.User{}).Where("id = ?", userID).
-        Update("working_hours", input.WorkingHours).Error; err != nil {
-        utils.RespondWithError(c, http.StatusInternalServerError, "Failed to update working hours")
-        return
-    }
+	if err := config.DB.Model(&models.User{}).
+		Where("id = ?", salonUUID).
+		Update("working_hours", input.WorkingHours).Error; err != nil {
+		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to update working hours")
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"message": "Working hours updated"})
+	c.JSON(http.StatusOK, gin.H{"message": "Working hours updated successfully"})
 }
 
-func UpdateNotificationSettings(c *gin.Context) {
-    userID, exists := c.Get("userId")
-    if !exists {
-        utils.RespondWithError(c, http.StatusUnauthorized, "User not found")
-        return
-    }
-
-    var input struct {
-        BirthdayReminders   bool `json:"birthdayReminders"`
-        AnniversaryReminders bool `json:"anniversaryReminders"`
-        WhatsAppNotifications bool `json:"whatsAppNotifications"`
-        SMSNotifications      bool `json:"smsNotifications"`
-    }
-    if err := c.ShouldBindJSON(&input); err != nil {
-        utils.RespondWithError(c, http.StatusBadRequest, "Invalid input")
-        return
-    }
-
-    // Save these fields in your user or a separate settings table as needed
-    if err := config.DB.Model(&models.User{}).Where("id = ?", userID).
-        Updates(map[string]interface{}{
-            "birthday_reminders":    input.BirthdayReminders,
-            "anniversary_reminders": input.AnniversaryReminders,
-            "whatsapp_notifications": input.WhatsAppNotifications,
-            "sms_notifications":      input.SMSNotifications,
-        }).Error; err != nil {
-        utils.RespondWithError(c, http.StatusInternalServerError, "Failed to update notification settings")
-        return
-    }
-
-    c.JSON(http.StatusOK, gin.H{"message": "Notification settings updated"})
+type UpdateTemplatesInput struct {
+	BirthdayMessage    string `json:"birthday" form:"birthday" binding:"omitempty"`
+	AnniversaryMessage string `json:"anniversary" form:"anniversary" binding:"omitempty"`
 }
 
+func UpdateReminderTemplates(c *gin.Context) {
+	salonID, exists := c.Get("salonId")
+	if !exists {
+		utils.RespondWithError(c, http.StatusUnauthorized, "Salon ID not found")
+		return
+	}
+	salonUUID, err := uuid.Parse(salonID.(string))
+	if err != nil {
+		utils.RespondWithError(c, http.StatusBadRequest, "Invalid salon ID")
+		return
+	}
 
-type UpdateReminderSettingInput struct {
-    Type     string `json:"type" binding:"required,oneof=birthday anniversary"`
-    IsActive *bool  `json:"isActive"`
-    Message  *string `json:"message"`
+	var input UpdateTemplatesInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		utils.RespondWithError(c, http.StatusBadRequest, "Invalid input: "+err.Error())
+		return
+	}
+
+	updates := []struct {
+		Type    string
+		Message string
+	}{
+		{"birthday", input.BirthdayMessage},
+		{"anniversary", input.AnniversaryMessage},
+	}
+
+	for _, u := range updates {
+		if err := config.DB.Model(&models.ReminderTemplate{}).
+			Where("salon_id = ? AND type = ?", salonUUID, u.Type).
+			Update("message", u.Message).Error; err != nil {
+			utils.RespondWithError(c, http.StatusInternalServerError, "Failed to update "+u.Type+" template")
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Templates updated successfully"})
 }
 
-func UpdateReminderSetting(c *gin.Context) {
-    salonID, exists := c.Get("salonId")
-    if !exists {
-        utils.RespondWithError(c, http.StatusUnauthorized, "Salon ID not found")
-        return
-    }
-
-    var input UpdateReminderSettingInput
-    if err := c.ShouldBindJSON(&input); err != nil {
-        utils.RespondWithError(c, http.StatusBadRequest, "Invalid input")
-        return
-    }
-
-    var template models.ReminderTemplate
-    if err := config.DB.Where("salon_id = ? AND type = ?", salonID, input.Type).First(&template).Error; err != nil {
-        utils.RespondWithError(c, http.StatusNotFound, "Reminder template not found")
-        return
-    }
-
-    if input.IsActive != nil {
-        template.IsActive = *input.IsActive
-    }
-    if input.Message != nil {
-        template.Message = *input.Message
-    }
-
-    if err := config.DB.Save(&template).Error; err != nil {
-        utils.RespondWithError(c, http.StatusInternalServerError, "Failed to update reminder setting")
-        return
-    }
-
-    c.JSON(http.StatusOK, gin.H{"message": "Reminder setting updated"})
+type UpdateNotificationsInput struct {
+	BirthdayReminders     bool `json:"birthdayReminders"`
+	AnniversaryReminders  bool `json:"anniversaryReminders"`
+	WhatsAppNotifications bool `json:"whatsAppNotifications"`
+	SMSNotifications      bool `json:"smsNotifications"`
 }
 
-func GetReminderSettings(c *gin.Context) {
-    salonID, exists := c.Get("salonId")
-    if !exists {
-        utils.RespondWithError(c, http.StatusUnauthorized, "Salon ID not found")
-        return
-    }
+func UpdateNotifications(c *gin.Context) {
+	salonID, exists := c.Get("salonId")
+	if !exists {
+		utils.RespondWithError(c, http.StatusUnauthorized, "Salon ID not found")
+		return
+	}
+	salonUUID, err := uuid.Parse(salonID.(string))
+	if err != nil {
+		utils.RespondWithError(c, http.StatusBadRequest, "Invalid salon ID")
+		return
+	}
 
-    var templates []models.ReminderTemplate
-    if err := config.DB.Where("salon_id = ?", salonID).Find(&templates).Error; err != nil {
-        utils.RespondWithError(c, http.StatusInternalServerError, "Failed to fetch reminder settings")
-        return
-    }
+	var input UpdateNotificationsInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		utils.RespondWithError(c, http.StatusBadRequest, "Invalid input: "+err.Error())
+		return
+	}
 
-    settings := gin.H{}
-    for _, t := range templates {
-        settings[t.Type+"_reminder"] = t.IsActive
-        settings[t.Type+"_message"] = t.Message
-    }
+	if err := config.DB.Model(&models.User{}).
+		Where("id = ?", salonUUID).
+		Updates(map[string]interface{}{
+			"birthday_reminders":      input.BirthdayReminders,
+			"anniversary_reminders":   input.AnniversaryReminders,
+			"whats_app_notifications": input.WhatsAppNotifications,
+			"sms_notifications":       input.SMSNotifications,
+		}).Error; err != nil {
+		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to update notifications")
+		return
+	}
 
-    c.JSON(http.StatusOK, settings)
+	c.JSON(http.StatusOK, gin.H{"message": "Notification settings updated successfully"})
 }

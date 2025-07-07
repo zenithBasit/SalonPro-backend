@@ -1,9 +1,7 @@
 package routes
 
 import (
-	"salonpro-backend/config"
 	"salonpro-backend/controllers"
-	"salonpro-backend/services"
 	"salonpro-backend/utils"
 
 	"github.com/gin-contrib/cors"
@@ -20,17 +18,25 @@ func SetupRouter() *gin.Engine {
 		AllowCredentials: true,
 	}))
 
-	r.GET("/test-reminder", func(c *gin.Context) {
-		reminderService := services.NewReminderService(config.DB)
-		reminderService.SendDailyReminders()
-		c.JSON(200, gin.H{"message": "Reminders triggered"})
-	})
+	// r.GET("/test-reminder", func(c *gin.Context) {
+	// 	reminderService := services.NewReminderService(config.DB)
+	// 	reminderService.SendDailyReminders()
+	// 	c.JSON(200, gin.H{"message": "Reminders triggered"})
+	// })
 
 	auth := r.Group("/auth")
 	{
 		auth.POST("/register", controllers.Register)
 		auth.POST("/login", controllers.Login)
-		auth.GET("/me", utils.AuthMiddleware(), controllers.Me)
+
+		auth.Use(utils.AuthMiddleware())
+		auth.GET("/me", controllers.Me)
+
+		// User profile routes
+		auth.GET("/employees", controllers.GetEmployees)
+		auth.POST("/employees", controllers.AddEmployee)
+		auth.PUT("/employees", controllers.UpdateEmployee)
+		auth.DELETE("/employees", controllers.DeleteEmployee)
 	}
 
 	api := r.Group("/api")
@@ -57,13 +63,6 @@ func SetupRouter() *gin.Engine {
 		api.PUT("/invoices/:id", controllers.UpdateInvoice)
 		api.DELETE("/invoices/:id", controllers.DeleteInvoice)
 
-		// Reminders routes
-		api.POST("/reminder-templates", controllers.CreateReminderTemplate)
-		api.GET("/reminder-templates", controllers.GetReminderTemplates)
-		api.GET("/reminder-templates/:id", controllers.GetReminderTemplate)
-		api.PUT("/reminder-templates/:id", controllers.UpdateReminderTemplate)
-		api.DELETE("/reminder-templates/:id", controllers.DeleteReminderTemplate)
-
 		//Reports routes
 		reportController := controllers.ReportController{}
 		api.GET("/reports", reportController.GetReportAnalytics)
@@ -73,12 +72,17 @@ func SetupRouter() *gin.Engine {
 
 		// Settings routes
 		auth.GET("/profile", utils.AuthMiddleware(), controllers.GetProfile)
-		auth.PUT("/update-profile", utils.AuthMiddleware(), controllers.UpdateProfile)
-		auth.PUT("/working-hours", utils.AuthMiddleware(), controllers.UpdateWorkingHours)
-		auth.PUT("/notification-settings", utils.AuthMiddleware(), controllers.UpdateNotificationSettings)
+		auth.PUT("/profile/update-salon", utils.AuthMiddleware(), controllers.UpdateSalonProfile)
+		auth.PUT("/profile/update-hours", utils.AuthMiddleware(), controllers.UpdateWorkingHours)
+		auth.PUT("/profile/update-templates", utils.AuthMiddleware(), controllers.UpdateReminderTemplates)
+		auth.PUT("/profile/update-notifications", utils.AuthMiddleware(), controllers.UpdateNotifications)
 
-		api.GET("/reminder-settings", controllers.GetReminderSettings)
-		api.PUT("/reminder-settings", controllers.UpdateReminderSetting)
+		// auth.PUT("/update-profile", utils.AuthMiddleware(), controllers.UpdateProfile)
+		// auth.PUT("/working-hours", utils.AuthMiddleware(), controllers.UpdateWorkingHours)
+		// auth.PUT("/notification-settings", utils.AuthMiddleware(), controllers.UpdateNotificationSettings)
+
+		// api.GET("/reminder-settings", controllers.GetReminderSettings)
+		// api.PUT("/reminder-settings", controllers.UpdateReminderSetting)
 	}
 
 	return r

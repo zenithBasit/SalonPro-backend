@@ -41,6 +41,11 @@ func CreateCustomer(c *gin.Context) {
 		utils.RespondWithError(c, http.StatusUnauthorized, "Salon ID not found in context")
 		return
 	}
+	userID, exists := c.Get("userId")
+	if !exists {
+		utils.RespondWithError(c, http.StatusUnauthorized, "User ID not found in context")
+		return
+	}
 
 	salonUUID, err := uuid.Parse(salonID.(string))
 	if err != nil {
@@ -73,14 +78,15 @@ func CreateCustomer(c *gin.Context) {
 
 	// Create new customer
 	customer := models.Customer{
-		ID: uuid.New(),
-		SalonID:     salonUUID,
-		Name:        input.Name,
-		Phone:       input.Phone,
-		Birthday:    input.Birthday,
-		Anniversary: input.Anniversary,
-		Notes:       input.Notes,
-		IsActive:    true,
+		ID:              uuid.New(),
+		SalonID:         salonUUID,
+		CreatedByUserID: uuid.Must(uuid.Parse(userID.(string))),
+		Name:            input.Name,
+		Phone:           input.Phone,
+		Birthday:        input.Birthday,
+		Anniversary:     input.Anniversary,
+		Notes:           input.Notes,
+		IsActive:        true,
 	}
 
 	if input.Email != nil {

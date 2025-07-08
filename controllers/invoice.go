@@ -55,6 +55,12 @@ func CreateInvoice(c *gin.Context) {
 		return
 	}
 
+	userID, exists := c.Get("userId")
+	if !exists {
+		utils.RespondWithError(c, http.StatusUnauthorized, "User ID not found in context")
+		return
+	}
+
 	salonUUID, err := uuid.Parse(salonID.(string))
 	if err != nil {
 		utils.RespondWithError(c, http.StatusInternalServerError, "Invalid salon ID format")
@@ -121,19 +127,20 @@ func CreateInvoice(c *gin.Context) {
 
 	// Create new invoice
 	invoice := models.Invoice{
-		ID:            uuid.New(),
-		SalonID:       salonUUID,
-		CustomerID:    input.CustomerID,
-		InvoiceDate:   invoiceDate,
-		Subtotal:      subtotal,
-		Discount:      input.Discount,
-		Tax:           input.Tax,
-		Total:         total,
-		PaymentStatus: input.PaymentStatus,
-		PaidAmount:    input.PaidAmount,
-		PaymentMethod: input.PaymentMethod,
-		Notes:         input.Notes,
-		Items:         invoiceItems,
+		ID:              uuid.New(),
+		CreatedByUserID: uuid.Must(uuid.Parse(userID.(string))),
+		SalonID:         salonUUID,
+		CustomerID:      input.CustomerID,
+		InvoiceDate:     invoiceDate,
+		Subtotal:        subtotal,
+		Discount:        input.Discount,
+		Tax:             input.Tax,
+		Total:           total,
+		PaymentStatus:   input.PaymentStatus,
+		PaidAmount:      input.PaidAmount,
+		PaymentMethod:   input.PaymentMethod,
+		Notes:           input.Notes,
+		Items:           invoiceItems,
 	}
 
 	// Generate invoice number (you might want a better way)

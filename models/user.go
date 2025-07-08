@@ -12,7 +12,7 @@ import (
 )
 
 type User struct {
-	ID       uuid.UUID `gorm:"type:uuid;primary_key"`
+	ID       uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
 	Email    string    `gorm:"uniqueIndex;not null"`
 	Password string    `gorm:"not null"`
 	Name     string    `gorm:"not null"`
@@ -20,6 +20,8 @@ type User struct {
 
 	Role    string    `gorm:"type:varchar(20);not null"` // 'owner' or 'employee'
 	SalonID uuid.UUID `gorm:"type:uuid;index;not null"`
+
+	Salon Salon `gorm:"foreignKey:SalonID"`
 
 	LastLogin *time.Time
 	IsActive  bool `gorm:"default:true"`

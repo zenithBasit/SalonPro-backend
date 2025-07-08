@@ -6,7 +6,7 @@ import (
 )
 
 type Service struct {
-	ID           uuid.UUID `gorm:"type:uuid;primary_key"`
+	ID           uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
 	SalonID      uuid.UUID `gorm:"type:uuid;index;not null"`
 	Name         string    `gorm:"not null"`
 	Description  string
@@ -14,6 +14,8 @@ type Service struct {
 	Duration     int     // in minutes
 	Category     string  `gorm:"default:'General'"`
 	IsActive     bool    `gorm:"default:true"`
-	InvoiceItems []InvoiceItem
+
+	InvoiceItems []InvoiceItem `gorm:"foreignKey:ServiceID"`
+
 	gorm.Model
 }

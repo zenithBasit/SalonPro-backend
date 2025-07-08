@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"salonpro-backend/config"
 	"salonpro-backend/controllers"
 	"salonpro-backend/utils"
 
@@ -17,6 +18,8 @@ func SetupRouter() *gin.Engine {
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		AllowCredentials: true,
 	}))
+
+	r.Use(config.PerformanceLogger())
 
 	auth := r.Group("/auth")
 	{

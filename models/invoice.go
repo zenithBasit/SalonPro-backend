@@ -8,7 +8,7 @@ import (
 )
 
 type Invoice struct {
-	ID              uuid.UUID `gorm:"type:uuid;primary_key"`
+	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
 	SalonID         uuid.UUID `gorm:"type:uuid;index;not null"`
 	CreatedByUserID uuid.UUID `gorm:"type:uuid;index;not null"`
 
@@ -26,17 +26,19 @@ type Invoice struct {
 	PaymentMethod string
 	Notes         string
 
-	Items []InvoiceItem
+	Items []InvoiceItem `gorm:"foreignKey:InvoiceID"`
+
 	gorm.Model
 }
 
 type InvoiceItem struct {
-	ID          uuid.UUID `gorm:"type:uuid;primary_key"`
+	ID          uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
 	InvoiceID   uuid.UUID `gorm:"type:uuid;index;not null"`
 	ServiceID   uuid.UUID `gorm:"type:uuid;index;not null"`
 	ServiceName string    `gorm:"not null"`
 	Quantity    int       `gorm:"default:1"`
 	UnitPrice   float64   `gorm:"type:decimal(10,2);not null"`
 	TotalPrice  float64   `gorm:"type:decimal(10,2);not null"`
+
 	gorm.Model
 }

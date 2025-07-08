@@ -8,12 +8,12 @@ import (
 )
 
 type Customer struct {
-	ID              uuid.UUID `gorm:"type:uuid;primary_key"`
+	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
 	SalonID         uuid.UUID `gorm:"type:uuid;index;not null"`
 	CreatedByUserID uuid.UUID `gorm:"type:uuid;index;not null"`
 
 	Name        string `gorm:"not null"`
-	Phone       string `gorm:"not null;index:,unique,composite:salon_phone"`
+	Phone       string `gorm:"not null;uniqueIndex:idx_salon_phone,priority:2"`
 	Email       string
 	Birthday    *time.Time
 	Anniversary *time.Time
@@ -23,6 +23,8 @@ type Customer struct {
 	LastVisit   *time.Time
 	IsActive    bool `gorm:"default:true"`
 
-	Invoices []Invoice
+	Invoices []Invoice `gorm:"foreignKey:CustomerID"`
+
 	gorm.Model
 }
+

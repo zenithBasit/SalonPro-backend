@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type Customer struct {
@@ -24,7 +23,4 @@ type Customer struct {
 	IsActive    bool `gorm:"default:true"`
 
 	Invoices []Invoice `gorm:"foreignKey:CustomerID"`
-
-	gorm.Model
 }
-

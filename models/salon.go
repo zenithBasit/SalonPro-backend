@@ -2,7 +2,6 @@ package models
 
 import (
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type Salon struct {
@@ -20,6 +19,4 @@ type Salon struct {
 	Services          []Service          `gorm:"foreignKey:SalonID"`
 	Invoices          []Invoice          `gorm:"foreignKey:SalonID"`
 	ReminderTemplates []ReminderTemplate `gorm:"foreignKey:SalonID"`
-
-	gorm.Model
 }

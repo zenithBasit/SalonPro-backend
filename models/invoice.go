@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type Invoice struct {
@@ -27,8 +26,6 @@ type Invoice struct {
 	Notes         string
 
 	Items []InvoiceItem `gorm:"foreignKey:InvoiceID"`
-
-	gorm.Model
 }
 
 type InvoiceItem struct {
@@ -39,6 +36,4 @@ type InvoiceItem struct {
 	Quantity    int       `gorm:"default:1"`
 	UnitPrice   float64   `gorm:"type:decimal(10,2);not null"`
 	TotalPrice  float64   `gorm:"type:decimal(10,2);not null"`
-
-	gorm.Model
 }

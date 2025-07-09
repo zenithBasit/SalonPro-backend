@@ -26,7 +26,8 @@ type User struct {
 	LastLogin *time.Time
 	IsActive  bool `gorm:"default:true"`
 
-	gorm.Model
+	CreatedAt time.Time `gorm:"autoCreateTime"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`	
 }
 
 // Initialize UUID before creating

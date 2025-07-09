@@ -2,10 +2,11 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"salonpro-backend/config"
-	"salonpro-backend/models"
 	"salonpro-backend/utils"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,15 +18,17 @@ type ReportController struct{}
 
 // AnalyticsSummary represents the Analytics data
 type AnalyticsSummary struct {
-	CurrentMonthRevenue   float64           `json:"currentMonthRevenue"`
-	MonthGrowth           float64           `json:"monthGrowth"`
-	CurrentQuarterRevenue float64           `json:"currentQuarterRevenue"`
-	QuarterGrowth         float64           `json:"quarterGrowth"`
-	CurrentYearRevenue    float64           `json:"currentYearRevenue"`
-	YearGrowth            float64           `json:"yearGrowth"`
-	TopServices           []ServiceSummary  `json:"topServices"`
-	TopCustomers          []CustomerSummary `json:"topCustomers"`
-	QuickStats            QuickStatistics   `json:"quickStats"`
+	CurrentMonthRevenue    float64                `json:"currentMonthRevenue"`
+	MonthGrowth            float64                `json:"monthGrowth"`
+	CurrentQuarterRevenue  float64                `json:"currentQuarterRevenue"`
+	QuarterGrowth          float64                `json:"quarterGrowth"`
+	CurrentYearRevenue     float64                `json:"currentYearRevenue"`
+	YearGrowth             float64                `json:"yearGrowth"`
+	TopServices            []ServiceSummary       `json:"topServices"`
+	TopCustomers           []CustomerSummary      `json:"topCustomers"`
+	QuickStats             QuickStatistics        `json:"quickStats"`
+	TopEmployees           []EmployeeSummary      `json:"topEmployees"`
+	EmployeeServiceSummary []EmployeeServiceStats `json:"employeeServiceSummary"`
 }
 
 type ServiceSummary struct {
@@ -47,7 +50,30 @@ type QuickStatistics struct {
 	AvgOrderValue    float64 `json:"avgOrderValue"`
 }
 
-// GetDashboard returns the complete dashboard summary
+type EmployeeSummary struct {
+	Name            string  `json:"name"`
+	Revenue         float64 `json:"revenue"`
+	ServicesHandled int     `json:"servicesHandled"`
+}
+
+type EmployeeServiceStats struct {
+	EmployeeName string  `json:"employeeName"`
+	ServiceName  string  `json:"serviceName"`
+	Count        int     `json:"count"`
+	Revenue      float64 `json:"revenue"`
+}
+
+// RevenueData holds consolidated revenue information
+type RevenueData struct {
+	CurrentMonth   float64
+	LastMonth      float64
+	CurrentQuarter float64
+	LastQuarter    float64
+	CurrentYear    float64
+	LastYear       float64
+}
+
+// GetReportAnalytics returns the complete dashboard summary with optimizations
 func (rc *ReportController) GetReportAnalytics(c *gin.Context) {
 	salonID, exists := c.Get("salonId")
 	if !exists {
@@ -61,115 +87,344 @@ func (rc *ReportController) GetReportAnalytics(c *gin.Context) {
 		return
 	}
 
-	// Get current time
 	now := time.Now()
 	currentYear, currentMonth, _ := now.Date()
 	currentLocation := now.Location()
 
-	// Calculate date ranges
+	// Calculate all date ranges once
 	firstOfMonth := time.Date(currentYear, currentMonth, 1, 0, 0, 0, 0, currentLocation)
 	lastOfMonth := firstOfMonth.AddDate(0, 1, -1)
 
-	// Get revenue reports
-	currentMonthRevenue, err := rc.getRevenue(salonUUID, firstOfMonth, lastOfMonth)
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to get monthly revenue")
-		return
+	// Use goroutines to fetch data concurrently
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	var revenueData RevenueData
+	var topServices []ServiceSummary
+	var topCustomers []CustomerSummary
+	var quickStats QuickStatistics
+	var topEmployees []EmployeeSummary
+	var employeeServiceStats []EmployeeServiceStats
+	var errors []error
+
+	addError := func(err error) {
+		mu.Lock()
+		errors = append(errors, err)
+		mu.Unlock()
 	}
 
-	lastMonthRevenue, err := rc.getRevenue(salonUUID,
-		firstOfMonth.AddDate(0, -1, 0),
-		lastOfMonth.AddDate(0, -1, 0))
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to get last month revenue")
-		return
-	}
+	// Fetch revenue data (consolidated query)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		data, err := rc.getConsolidatedRevenueData(salonUUID, now)
+		if err != nil {
+			addError(fmt.Errorf("failed to get revenue data: %w", err))
+			return
+		}
+		revenueData = data
+	}()
 
-	currentQuarterRevenue, err := rc.getRevenue(salonUUID,
-		rc.getQuarterStart(now),
-		rc.getQuarterEnd(now))
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to get quarterly revenue")
-		return
-	}
+	// Fetch top services
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		services, err := rc.getTopServices(salonUUID, firstOfMonth, lastOfMonth, 4)
+		if err != nil {
+			addError(fmt.Errorf("failed to get top services: %w", err))
+			return
+		}
+		topServices = services
+	}()
 
-	lastQuarterRevenue, err := rc.getRevenue(salonUUID,
-		rc.getQuarterStart(now).AddDate(0, -3, 0),
-		rc.getQuarterEnd(now).AddDate(0, -3, 0))
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to get last quarter revenue")
-		return
-	}
+	// Fetch top customers
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		customers, err := rc.getTopCustomers(salonUUID, firstOfMonth, lastOfMonth, 4)
+		if err != nil {
+			addError(fmt.Errorf("failed to get top customers: %w", err))
+			return
+		}
+		topCustomers = customers
+	}()
 
-	currentYearRevenue, err := rc.getRevenue(salonUUID,
-		time.Date(currentYear, 1, 1, 0, 0, 0, 0, currentLocation),
-		time.Date(currentYear, 12, 31, 23, 59, 59, 0, currentLocation))
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to get yearly revenue")
-		return
-	}
+	// Fetch quick statistics
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		stats, err := rc.getQuickStatistics(salonUUID)
+		if err != nil {
+			addError(fmt.Errorf("failed to get quick statistics: %w", err))
+			return
+		}
+		quickStats = stats
+	}()
 
-	lastYearRevenue, err := rc.getRevenue(salonUUID,
-		time.Date(currentYear-1, 1, 1, 0, 0, 0, 0, currentLocation),
-		time.Date(currentYear-1, 12, 31, 23, 59, 59, 0, currentLocation))
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to get last year revenue")
+	// Fetch top employees
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		employees, err := rc.getTopEmployees(salonUUID, firstOfMonth, lastOfMonth, 4)
+		if err != nil {
+			addError(fmt.Errorf("failed to get top employees: %w", err))
+			return
+		}
+		topEmployees = employees
+	}()
+
+	// Fetch employee service distribution
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		stats, err := rc.getEmployeeServiceDistribution(salonUUID, firstOfMonth, lastOfMonth)
+		if err != nil {
+			addError(fmt.Errorf("failed to get employee service distribution: %w", err))
+			return
+		}
+		employeeServiceStats = stats
+	}()
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+
+	// Check for errors
+	if len(errors) > 0 {
+		utils.RespondWithError(c, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch data: %v", errors[0]))
 		return
 	}
 
 	// Calculate growth percentages
-	monthGrowth := rc.calculateGrowthPercentage(currentMonthRevenue, lastMonthRevenue)
-	quarterGrowth := rc.calculateGrowthPercentage(currentQuarterRevenue, lastQuarterRevenue)
-	yearGrowth := rc.calculateGrowthPercentage(currentYearRevenue, lastYearRevenue)
-
-	// Get top services
-	topServices, err := rc.getTopServices(salonUUID, firstOfMonth, lastOfMonth, 4)
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to get top services")
-		return
-	}
-
-	// Get top customers
-	topCustomers, err := rc.getTopCustomers(salonUUID, firstOfMonth, lastOfMonth, 4)
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to get top customers")
-		return
-	}
-
-	// Get quick statistics
-	quickStats, err := rc.getQuickStatistics(salonUUID)
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to get quick statistics")
-		return
-	}
+	monthGrowth := rc.calculateGrowthPercentage(revenueData.CurrentMonth, revenueData.LastMonth)
+	quarterGrowth := rc.calculateGrowthPercentage(revenueData.CurrentQuarter, revenueData.LastQuarter)
+	yearGrowth := rc.calculateGrowthPercentage(revenueData.CurrentYear, revenueData.LastYear)
 
 	// Create response
 	summary := AnalyticsSummary{
-		CurrentMonthRevenue:   currentMonthRevenue,
-		MonthGrowth:           monthGrowth,
-		CurrentQuarterRevenue: currentQuarterRevenue,
-		QuarterGrowth:         quarterGrowth,
-		CurrentYearRevenue:    currentYearRevenue,
-		YearGrowth:            yearGrowth,
-		TopServices:           topServices,
-		TopCustomers:          topCustomers,
-		QuickStats:            quickStats,
+		CurrentMonthRevenue:    revenueData.CurrentMonth,
+		MonthGrowth:            monthGrowth,
+		CurrentQuarterRevenue:  revenueData.CurrentQuarter,
+		QuarterGrowth:          quarterGrowth,
+		CurrentYearRevenue:     revenueData.CurrentYear,
+		YearGrowth:             yearGrowth,
+		TopServices:            topServices,
+		TopCustomers:           topCustomers,
+		QuickStats:             quickStats,
+		TopEmployees:           topEmployees,
+		EmployeeServiceSummary: employeeServiceStats,
 	}
 
 	c.JSON(http.StatusOK, summary)
 }
 
-// Helper functions for reports
+// getConsolidatedRevenueData fetches all revenue data in a single optimized query
+func (rc *ReportController) getConsolidatedRevenueData(salonID uuid.UUID, now time.Time) (RevenueData, error) {
+	var data RevenueData
+	currentYear, currentMonth, _ := now.Date()
+	currentLocation := now.Location()
 
-func (rc *ReportController) getRevenue(salonID uuid.UUID, start, end time.Time) (float64, error) {
-	var total float64
-	err := config.DB.Model(&models.Invoice{}).
-		Where("salon_id = ? AND invoice_date BETWEEN ? AND ?", salonID, start, end).
-		Select("COALESCE(SUM(total), 0)").
-		Scan(&total).Error
-	return total, err
+	// Calculate all date ranges
+	firstOfMonth := time.Date(currentYear, currentMonth, 1, 0, 0, 0, 0, currentLocation)
+	lastOfMonth := firstOfMonth.AddDate(0, 1, -1)
+
+	firstOfLastMonth := firstOfMonth.AddDate(0, -1, 0)
+	lastOfLastMonth := firstOfMonth.AddDate(0, 0, -1)
+
+	quarterStart := rc.getQuarterStart(now)
+	quarterEnd := rc.getQuarterEnd(now)
+	lastQuarterStart := quarterStart.AddDate(0, -3, 0)
+	lastQuarterEnd := quarterEnd.AddDate(0, -3, 0)
+
+	yearStart := time.Date(currentYear, 1, 1, 0, 0, 0, 0, currentLocation)
+	yearEnd := time.Date(currentYear, 12, 31, 23, 59, 59, 0, currentLocation)
+	lastYearStart := time.Date(currentYear-1, 1, 1, 0, 0, 0, 0, currentLocation)
+	lastYearEnd := time.Date(currentYear-1, 12, 31, 23, 59, 59, 0, currentLocation)
+
+	// Single query to get all revenue data
+	query := `
+		SELECT 
+			COALESCE(SUM(CASE WHEN invoice_date BETWEEN ? AND ? THEN total ELSE 0 END), 0) as current_month,
+			COALESCE(SUM(CASE WHEN invoice_date BETWEEN ? AND ? THEN total ELSE 0 END), 0) as last_month,
+			COALESCE(SUM(CASE WHEN invoice_date BETWEEN ? AND ? THEN total ELSE 0 END), 0) as current_quarter,
+			COALESCE(SUM(CASE WHEN invoice_date BETWEEN ? AND ? THEN total ELSE 0 END), 0) as last_quarter,
+			COALESCE(SUM(CASE WHEN invoice_date BETWEEN ? AND ? THEN total ELSE 0 END), 0) as current_year,
+			COALESCE(SUM(CASE WHEN invoice_date BETWEEN ? AND ? THEN total ELSE 0 END), 0) as last_year
+		FROM invoices 
+		WHERE salon_id = ? AND deleted_at IS NULL
+	`
+
+	var result struct {
+		CurrentMonth   float64 `db:"current_month"`
+		LastMonth      float64 `db:"last_month"`
+		CurrentQuarter float64 `db:"current_quarter"`
+		LastQuarter    float64 `db:"last_quarter"`
+		CurrentYear    float64 `db:"current_year"`
+		LastYear       float64 `db:"last_year"`
+	}
+
+	err := config.DB.Raw(query,
+		firstOfMonth, lastOfMonth, // current month
+		firstOfLastMonth, lastOfLastMonth, // last month
+		quarterStart, quarterEnd, // current quarter
+		lastQuarterStart, lastQuarterEnd, // last quarter
+		yearStart, yearEnd, // current year
+		lastYearStart, lastYearEnd, // last year
+		salonID, // salon_id
+	).Scan(&result).Error
+
+	if err != nil {
+		return data, err
+	}
+
+	data.CurrentMonth = result.CurrentMonth
+	data.LastMonth = result.LastMonth
+	data.CurrentQuarter = result.CurrentQuarter
+	data.LastQuarter = result.LastQuarter
+	data.CurrentYear = result.CurrentYear
+	data.LastYear = result.LastYear
+
+	return data, nil
 }
 
+// getQuickStatistics optimized with a single query
+func (rc *ReportController) getQuickStatistics(salonID uuid.UUID) (QuickStatistics, error) {
+	var stats QuickStatistics
+
+	// Single query to get all statistics
+	query := `
+		SELECT 
+			(SELECT COUNT(*) FROM customers WHERE salon_id = ? AND deleted_at IS NULL) as total_customers,
+			(SELECT COUNT(*) FROM invoices WHERE salon_id = ? AND deleted_at IS NULL) as total_invoices,
+			(SELECT COALESCE(SUM(total), 0) FROM invoices WHERE salon_id = ? AND deleted_at IS NULL) as total_revenue,
+			(SELECT COALESCE(AVG(visits), 0) FROM (
+				SELECT COUNT(*) as visits
+				FROM invoices
+				WHERE salon_id = ? AND deleted_at IS NULL
+				GROUP BY DATE_TRUNC('month', invoice_date)
+			) monthly_visits) as avg_monthly_visits
+	`
+
+	var result struct {
+		TotalCustomers   int     `db:"total_customers"`
+		TotalInvoices    int     `db:"total_invoices"`
+		TotalRevenue     float64 `db:"total_revenue"`
+		AvgMonthlyVisits float64 `db:"avg_monthly_visits"`
+	}
+
+	err := config.DB.Raw(query, salonID, salonID, salonID, salonID).Scan(&result).Error
+	if err != nil {
+		return stats, err
+	}
+
+	stats.TotalCustomers = result.TotalCustomers
+	stats.TotalInvoices = result.TotalInvoices
+	stats.AvgMonthlyVisits = result.AvgMonthlyVisits
+
+	// Calculate average order value
+	if result.TotalInvoices > 0 {
+		stats.AvgOrderValue = result.TotalRevenue / float64(result.TotalInvoices)
+	}
+
+	return stats, nil
+}
+
+// Optimized helper functions with better indexing hints
+
+func (rc *ReportController) getTopServices(salonID uuid.UUID, start, end time.Time, limit int) ([]ServiceSummary, error) {
+	var services []ServiceSummary
+
+	// Optimized query with proper joins and indexing
+	query := `
+		SELECT s.name, 
+			   SUM(ii.quantity) as count, 
+			   SUM(ii.total_price) as revenue
+		FROM invoice_items ii
+		INNER JOIN invoices i ON i.id = ii.invoice_id 
+		INNER JOIN services s ON s.id = ii.service_id
+		WHERE i.salon_id = ? 
+		  AND i.invoice_date BETWEEN ? AND ? 
+		  AND i.deleted_at IS NULL 
+		  AND s.deleted_at IS NULL
+		GROUP BY s.id, s.name
+		ORDER BY revenue DESC
+		LIMIT ?
+	`
+
+	err := config.DB.Raw(query, salonID, start, end, limit).Scan(&services).Error
+	return services, err
+}
+
+func (rc *ReportController) getTopCustomers(salonID uuid.UUID, start, end time.Time, limit int) ([]CustomerSummary, error) {
+	var customers []CustomerSummary
+
+	query := `
+		SELECT c.name, 
+			   COUNT(i.id) as visits, 
+			   SUM(i.total) as spent
+		FROM invoices i
+		INNER JOIN customers c ON c.id = i.customer_id
+		WHERE i.salon_id = ? 
+		  AND i.invoice_date BETWEEN ? AND ? 
+		  AND i.deleted_at IS NULL 
+		  AND c.deleted_at IS NULL
+		GROUP BY c.id, c.name
+		ORDER BY spent DESC
+		LIMIT ?
+	`
+
+	err := config.DB.Raw(query, salonID, start, end, limit).Scan(&customers).Error
+	return customers, err
+}
+
+func (rc *ReportController) getTopEmployees(salonID uuid.UUID, start, end time.Time, limit int) ([]EmployeeSummary, error) {
+	var employees []EmployeeSummary
+
+	query := `
+		SELECT u.name, 
+			   SUM(i.total) as revenue, 
+			   COUNT(ii.id) as services_handled
+		FROM invoices i
+		INNER JOIN users u ON u.id = i.created_by_user_id
+		LEFT JOIN invoice_items ii ON ii.invoice_id = i.id
+		WHERE i.salon_id = ? 
+		  AND i.invoice_date BETWEEN ? AND ? 
+		  AND i.deleted_at IS NULL 
+		  AND u.deleted_at IS NULL
+		GROUP BY u.id, u.name
+		ORDER BY revenue DESC
+		LIMIT ?
+	`
+
+	err := config.DB.Raw(query, salonID, start, end, limit).Scan(&employees).Error
+	return employees, err
+}
+
+func (rc *ReportController) getEmployeeServiceDistribution(salonID uuid.UUID, start, end time.Time) ([]EmployeeServiceStats, error) {
+	var stats []EmployeeServiceStats
+
+	query := `
+		SELECT u.name as employee_name, 
+			   s.name as service_name, 
+			   SUM(ii.quantity) as count, 
+			   SUM(ii.total_price) as revenue
+		FROM invoice_items ii
+		INNER JOIN invoices i ON i.id = ii.invoice_id
+		INNER JOIN users u ON u.id = i.created_by_user_id
+		INNER JOIN services s ON s.id = ii.service_id
+		WHERE i.salon_id = ? 
+		  AND i.invoice_date BETWEEN ? AND ? 
+		  AND i.deleted_at IS NULL 
+		  AND s.deleted_at IS NULL 
+		  AND u.deleted_at IS NULL
+		GROUP BY u.id, u.name, s.id, s.name
+		ORDER BY u.name, s.name
+	`
+
+	err := config.DB.Raw(query, salonID, start, end).Scan(&stats).Error
+	return stats, err
+}
+
+// Helper functions remain the same
 func (rc *ReportController) getQuarterStart(date time.Time) time.Time {
 	quarter := (int(date.Month())-1)/3 + 1
 	startMonth := time.Month((quarter-1)*3 + 1)
@@ -188,87 +443,4 @@ func (rc *ReportController) calculateGrowthPercentage(current, previous float64)
 		return 100
 	}
 	return ((current - previous) / previous) * 100
-}
-
-func (rc *ReportController) getTopServices(salonID uuid.UUID, start, end time.Time, limit int) ([]ServiceSummary, error) {
-	var services []ServiceSummary
-
-	err := config.DB.Table("invoice_items").
-		Select("services.name, SUM(invoice_items.quantity) as count, SUM(invoice_items.total_price) as revenue").
-		Joins("JOIN invoices ON invoices.id = invoice_items.invoice_id").
-		Joins("JOIN services ON services.id = invoice_items.service_id").
-		Where("invoices.salon_id = ? AND invoices.invoice_date BETWEEN ? AND ? AND invoices.deleted_at IS NULL AND services.deleted_at IS NULL", salonID, start, end).
-		Group("services.name").
-		Order("revenue DESC").
-		Limit(limit).
-		Scan(&services).Error
-
-	return services, err
-}
-
-func (rc *ReportController) getTopCustomers(salonID uuid.UUID, start, end time.Time, limit int) ([]CustomerSummary, error) {
-	var customers []CustomerSummary
-
-	err := config.DB.Table("invoices").
-		Select("customers.name, COUNT(invoices.id) as visits, SUM(invoices.total) as spent").
-		Joins("JOIN customers ON customers.id = invoices.customer_id").
-		Where("invoices.salon_id = ? AND invoices.invoice_date BETWEEN ? AND ? AND invoices.deleted_at IS NULL AND customers.deleted_at IS NULL", salonID, start, end).
-		Group("customers.name").
-		Order("spent DESC").
-		Limit(limit).
-		Scan(&customers).Error
-
-	return customers, err
-}
-
-func (rc *ReportController) getQuickStatistics(salonID uuid.UUID) (QuickStatistics, error) {
-	var stats QuickStatistics
-
-	// Total Customers
-	var totalCustomers int64
-	if err := config.DB.Model(&models.Customer{}).
-		Where("salon_id = ? AND deleted_at IS NULL", salonID).
-		Count(&totalCustomers).Error; err != nil {
-		return stats, err
-	}
-	stats.TotalCustomers = int(totalCustomers)
-
-	// Total Invoices
-	var totalInvoices int64
-	if err := config.DB.Model(&models.Invoice{}).
-		Where("salon_id = ? AND deleted_at IS NULL", salonID).
-		Count(&totalInvoices).Error; err != nil {
-		return stats, err
-	}
-	stats.TotalInvoices = int(totalInvoices)
-
-	// Average Monthly Visits
-	var avgVisits float64
-	err := config.DB.Raw(`
-		SELECT COALESCE(AVG(visits), 0) FROM (
-			SELECT COUNT(*) as visits
-			FROM invoices
-			WHERE salon_id = ? AND deleted_at IS NULL
-			GROUP BY DATE_TRUNC('month', invoice_date)
-    	) monthly_visits
-	`, salonID).Scan(&avgVisits).Error
-	if err != nil {
-		return stats, err
-	}
-	stats.AvgMonthlyVisits = avgVisits
-
-	// Average Order Value
-	var totalRevenue float64
-	if err := config.DB.Model(&models.Invoice{}).
-		Where("salon_id = ? AND deleted_at IS NULL", salonID).
-		Select("COALESCE(SUM(total), 0)").
-		Scan(&totalRevenue).Error; err != nil {
-		return stats, err
-	}
-
-	if stats.TotalInvoices > 0 {
-		stats.AvgOrderValue = totalRevenue / float64(stats.TotalInvoices)
-	}
-
-	return stats, nil
 }

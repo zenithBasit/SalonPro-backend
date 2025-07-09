@@ -2,7 +2,6 @@ package models
 
 import (
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type ReminderTemplate struct {
@@ -11,5 +10,4 @@ type ReminderTemplate struct {
 	Type     string    `gorm:"type:reminder_type;not null"`
 	Message  string    `gorm:"type:text;not null"`
 	IsActive bool      `gorm:"default:true"`
-	gorm.Model
 }

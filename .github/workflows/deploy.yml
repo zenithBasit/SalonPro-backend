@@ -29,7 +29,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "salonpro"
-          target: "/home/azureuser/salonpro/"
+          target: "/home/azureuser/SalonPro-backend/"
 
       - name: Restart app on server
         uses: appleboy/ssh-action@v1.0.0

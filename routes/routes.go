@@ -13,7 +13,12 @@ func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "https://preview--salonpro-master-plan.lovable.app", "https://white-sky-0debbc31e.1.azurestaticapps.net"}, // change to your frontend URL
+		AllowOrigins: []string{
+			"http://localhost:3000",
+			"https://preview--salonpro-master-plan.lovable.app",
+			"https://white-sky-0debbc31e.1.azurestaticapps.net", // <-- No trailing slash
+			"https://salon.zenithive.digital", // If you want to allow direct API calls from your backend domain
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		AllowCredentials: true,

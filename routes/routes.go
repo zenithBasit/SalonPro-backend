@@ -14,14 +14,19 @@ func SetupRouter() *gin.Engine {
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
+			"https://white-sky-0debbc31e.1.azurestaticapps.net",
+			"https://salon.zenithive.digital",
 			"http://localhost:3000",
-			"https://preview--salonpro-master-plan.lovable.app",
-			"https://white-sky-0debbc31e.1.azurestaticapps.net", // <-- No trailing slash
-			"https://salon.zenithive.digital", // If you want to allow direct API calls from your backend domain
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
+		AllowOriginFunc: func(origin string) bool {
+			return origin == "https://white-sky-0debbc31e.1.azurestaticapps.net" ||
+				origin == "https://salon.zenithive.digital" ||
+				origin == "http://localhost:3000"
+		},
 	}))
 
 	r.Use(config.PerformanceLogger())

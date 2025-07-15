@@ -13,11 +13,14 @@ func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{}, // empty – let Nginx handle it
+		AllowOrigins: []string{
+			"https://white-sky-0debbc31e.1.azurestaticapps.net",
+			"https://salon.zenithive.digital",
+			"http://localhost:3000",
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		AllowCredentials: true,
-		AllowOriginFunc:  nil, // do not set
 	}))
 
 	r.Use(config.PerformanceLogger())

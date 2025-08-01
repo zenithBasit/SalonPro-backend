@@ -16,6 +16,7 @@ func SetupRouter() *gin.Engine {
 		AllowOrigins: []string{
 			"https://white-sky-0debbc31e.1.azurestaticapps.net",
 			"https://salon.zenithive.digital",
+			"https://salonpro.zenithive.digital",
 			"http://localhost:3000",
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"fmt"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -11,6 +12,7 @@ var DB *gorm.DB
 
 func ConnectDB() {
 	dsn := os.Getenv("DB_URL")
+	fmt.Print("Database URL:", dsn) // Debugging line to print the DSN
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
